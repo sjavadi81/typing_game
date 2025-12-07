@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Typing Trainer</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --text-default: #333333;
+      --text-correct: #9DFF91;
+      --text-error: #FF6B6B;
+      --cursor-bg: #1E1E1E;
+      --error-bg: #401010;
+      --font-main: "Fira Code", "FiraCode Nerd Font", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text-default);
+      font-family: var(--font-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 10px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid #111;
+    }
+
+    .fullscreen-btn {
+      background: transparent;
+      border: none;
+      color: #777;
+      font-size: 18px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    .fullscreen-btn:hover {
+      color: #fff;
+    }
+
+    .typing-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 80px;
+    }
+
+    .text-area {
+      max-width: 900px;
+      line-height: 1.6;
+      font-size: 20px;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      cursor: default;
+      user-select: none;
+    }
+
+    .char {
+      color: var(--text-default);
+      background: transparent;
+    }
+
+    .char.correct {
+      color: var(--text-correct);
+    }
+
+    .char.error {
+      color: var(--text-error);
+      background: var(--error-bg);
+    }
+
+    .char.cursor {
+      background: var(--cursor-bg);
+    }
+
+    /* End screen modal */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .overlay.visible {
+      display: flex;
+    }
+
+    .end-card {
+      background: #050505;
+      border: 1px solid #222;
+      padding: 24px 30px;
+      border-radius: 12px;
+      min-width: 320px;
+      max-width: 420px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .end-title {
+      color: var(--text-correct);
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    .stats-line {
+      color: #bbbbbb;
+      font-size: 16px;
+      margin: 4px 0;
+    }
+
+    .end-buttons {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+      gap: 10px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 14px;
+      font-family: var(--font-main);
+      cursor: pointer;
+    }
+
+    .btn-close {
+      background: #222222;
+      color: #ffffff;
+    }
+
+    .btn-close:hover {
+      background: #333333;
+    }
+
+    .btn-restart {
+      background: #2a4b2a;
+      color: #ffffff;
+    }
+
+    .btn-restart:hover {
+      background: #346a34;
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: #555;
+      pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+      .typing-container {
+        padding: 24px;
+      }
+      .text-area {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <button class="fullscreen-btn" id="fullscreenBtn" title="Toggle fullscreen">⛶</button>
+  </div>
+
+  <div class="typing-container" id="typingRoot">
+    <div class="text-area" id="textArea"></div>
+  </div>
+
+  <div class="overlay" id="endOverlay">
+    <div class="end-card">
+      <div class="end-title">Session Finished</div>
+      <div class="stats-line" id="statCorrected"></div>
+      <div class="stats-line" id="statRaw"></div>
+      <div class="stats-line" id="statTime"></div>
+      <div class="stats-line" id="statWpm"></div>
+      <div class="end-buttons">
+        <button class="btn btn-restart" id="restartBtn">Restart</button>
+        <button class="btn btn-close" id="closeBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">
+    Start typing anywhere • Backspace to fix • F11 / ⛶ for fullscreen
+  </div>
+
+  <script>
+    // ==========================
+    // CONFIG (matching Python)
+    // ==========================
+    const ALLOWED_CHARS = "jkl;";
+    const WORD_COUNT = 200;
+    const MIN_WORD_LEN = 3;
+    const MAX_WORD_LEN = 7;
+
+    const END_SCREEN_ENABLED = true;
+
+    // ==========================
+    // STATE
+    // ==========================
+    let targetText = "";
+    let index = 0;
+    let started = false;
+    let finished = false;
+
+    let startTime = null;
+    let endTime = null;
+    let totalKeystrokes = 0;
+    let correctKeystrokes = 0;
+
+    const textArea = document.getElementById("textArea");
+    const overlay = document.getElementById("endOverlay");
+    const statCorrected = document.getElementById("statCorrected");
+    const statRaw = document.getElementById("statRaw");
+    const statTime = document.getElementById("statTime");
+    const statWpm = document.getElementById("statWpm");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const typingRoot = document.getElementById("typingRoot");
+
+    // ==========================
+    // HELPERS
+    // ==========================
+
+    function generateText(chars, wordCount, minLen, maxLen) {
+      const words = [];
+      for (let i = 0; i < wordCount; i++) {
+        const length = randomInt(minLen, maxLen);
+        let w = "";
+        for (let j = 0; j < length; j++) {
+          const ch = chars[Math.floor(Math.random() * chars.length)];
+          w += ch;
+        }
+        words.push(w);
+      }
+      return words.join(" ");
+    }
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function renderText() {
+      textArea.innerHTML = "";
+      for (let i = 0; i < targetText.length; i++) {
+        const span = document.createElement("span");
+        span.classList.add("char");
+        span.dataset.index = i.toString();
+        const ch = targetText[i];
+        // Preserve spaces properly
+        span.textContent = ch === " " ? " " : ch;
+        textArea.appendChild(span);
+      }
+      if (targetText.length > 0) {
+        setCursor(0);
+      }
+    }
+
+    function setCursor(i) {
+      const chars = textArea.querySelectorAll(".char");
+      chars.forEach(c => c.classList.remove("cursor"));
+      if (i >= 0 && i < chars.length) {
+        chars[i].classList.add("cursor");
+      }
+    }
+
+    function handleBackspace() {
+      if (finished || index === 0) return;
+      index -= 1;
+      const span = textArea.querySelector(`.char[data-index="${index}"]`);
+      if (span) {
+        span.classList.remove("correct", "error");
+      }
+      setCursor(index);
+    }
+
+    function finish() {
+      if (finished) return;
+      finished = true;
+      endTime = performance.now() / 1000; // seconds
+
+      // remove cursor
+      const chars = textArea.querySelectorAll(".char");
+      chars.forEach(c => c.classList.remove("cursor"));
+
+      const totalChars = targetText.length;
+      let correctFinal = 0;
+      chars.forEach(span => {
+        if (span.classList.contains("correct")) {
+          correctFinal += 1;
+        }
+      });
+
+      let accuracyCorrected = 0;
+      if (totalChars > 0) {
+        accuracyCorrected = (correctFinal / totalChars) * 100;
+      }
+
+      let accuracyRaw = 0;
+      if (totalKeystrokes > 0) {
+        accuracyRaw = (correctKeystrokes / totalKeystrokes) * 100;
+      }
+
+      let duration = 0;
+      if (startTime !== null && endTime !== null) {
+        duration = Math.max(endTime - startTime, 0);
+      }
+
+      const wordCount = targetText.split(/\s+/).filter(Boolean).length;
+      let wpm = 0;
+      if (duration > 0) {
+        wpm = (wordCount / duration) * 60;
+      }
+
+      if (END_SCREEN_ENABLED) {
+        showEndScreen(accuracyCorrected, accuracyRaw, duration, wpm);
+      }
+    }
+
+    function fmtPct(x) {
+      return x.toFixed(1) + "%";
+    }
+
+    function fmtTime(t) {
+      return t.toFixed(2) + " s";
+    }
+
+    function fmtWpm(v) {
+      return v.toFixed(2) + " wpm";
+    }
+
+    function showEndScreen(accCorrected, accRaw, duration, wpm) {
+      statCorrected.textContent =
+        "Accuracy (with correction):    " + fmtPct(accCorrected);
+      statRaw.textContent =
+        "Accuracy (without correction): " + fmtPct(accRaw);
+      statTime.textContent = "Time:                          " + fmtTime(duration);
+      statWpm.textContent = "WPM:                           " + fmtWpm(wpm);
+
+      overlay.classList.add("visible");
+    }
+
+    function restartSession() {
+      targetText = generateText(ALLOWED_CHARS, WORD_COUNT, MIN_WORD_LEN, MAX_WORD_LEN);
+      index = 0;
+      started = false;
+      finished = false;
+      startTime = null;
+      endTime = null;
+      totalKeystrokes = 0;
+      correctKeystrokes = 0;
+      overlay.classList.remove("visible");
+      renderText();
+    }
+
+    // ==========================
+    // EVENT HANDLERS
+    // ==========================
+
+    function onKeyDown(event) {
+      // Prevent scrolling on Space, etc.
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
+        event.preventDefault();
+      }
+
+      if (finished) return;
+
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        handleBackspace();
+        return;
+      }
+
+      let ch;
+      if (event.key === " ") {
+        ch = " ";
+      } else {
+        ch = event.key;
+      }
+
+      if (!ch || ch.length !== 1) {
+        return;
+      }
+
+      if (!started) {
+        started = true;
+        startTime = performance.now() / 1000; // seconds
+      }
+
+      if (index >= targetText.length) {
+        finish();
+        return;
+      }
+
+      const expected = targetText[index];
+
+      totalKeystrokes += 1;
+
+      const span = textArea.querySelector(`.char[data-index="${index}"]`);
+      if (span) {
+        if (ch === expected) {
+          span.classList.add("correct");
+          span.classList.remove("error");
+          correctKeystrokes += 1;
+        } else {
+          span.classList.add("error");
+          span.classList.remove("correct");
+        }
+      }
+
+      index += 1;
+      if (index >= targetText.length) {
+        finish();
+      } else {
+        setCursor(index);
+      }
+    }
+
+    // Fullscreen toggling
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        if (typingRoot.requestFullscreen) {
+          typingRoot.requestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // ==========================
+    // INIT
+    // ==========================
+
+    restartSession();
+
+    document.addEventListener("keydown", onKeyDown);
+    fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+    document.getElementById("restartBtn").addEventListener("click", () => {
+      restartSession();
+    });
+
+    document.getElementById("closeBtn").addEventListener("click", () => {
+      overlay.classList.remove("visible");
+    });
+
+    // Optional: clicking in text area focuses document for typing
+    textArea.addEventListener("click", () => {
+      // nothing needed, but keeps interaction intuitive
+    });
+  </script>
+</body>
+</html>
