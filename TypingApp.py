@@ -315,7 +315,7 @@ class TypingApp:
         else:
             accuracy_raw = 0.0
 
-        # Time and WPS
+        # Time and WPM
         if self.start_time is not None and self.end_time is not None:
             duration = max(self.end_time - self.start_time, 0.0)
         else:
@@ -323,23 +323,23 @@ class TypingApp:
 
         word_count = len(self.target_text.split())
         if duration > 0:
-            wps = (word_count / duration) * 60
+            wpm = (word_count / duration) * 60
         else:
-            wps = 0.0
+            wpm = 0.0
 
         if END_SCREEN_ENABLED:
             self.show_end_screen(
                 accuracy_corrected=accuracy_corrected,
                 accuracy_raw=accuracy_raw,
                 duration=duration,
-                wps=wps
+                wpm=wpm
             )
         else:
             # If no end screen, immediately reset for a new session
             self.reset_session()
 
     # --- End screen ---
-    def show_end_screen(self, accuracy_corrected, accuracy_raw, duration, wps):
+    def show_end_screen(self, accuracy_corrected, accuracy_raw, duration, wpm):
         end_win = tk.Toplevel(self.root)
         self.end_win = end_win  # store reference
 
@@ -369,14 +369,14 @@ class TypingApp:
         def fmt_time(t):
             return f"{t:.2f} s"
 
-        def fmt_wps(v):
-            return f"{v:.2f} wps"
+        def fmt_wpm(v):
+            return f"{v:.2f} wpm"
 
         stats = [
             f"Accuracy (with correction):    {fmt_pct(accuracy_corrected)}",
             f"Accuracy (without correction): {fmt_pct(accuracy_raw)}",
             f"Time:                          {fmt_time(duration)}",
-            f"WPM:                           {fmt_wps(wps)}",
+            f"WPM:                           {fmt_wpm(wpm)}",
         ]
 
         for line in stats:
