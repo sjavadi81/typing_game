@@ -7,21 +7,21 @@ import os
 # CONFIG
 # ==========================
 
-ALLOWED_CHARS = "jkl;"
-WORD_COUNT = 200
-MIN_WORD_LEN = 3
-MAX_WORD_LEN = 5
+ALLOWED_CHARS = "asdfjkl;"
+WORD_COUNT = 50
+MIN_WORD_LEN = 2
+MAX_WORD_LEN = 3
 
 KEY_SOUND = ""
 ERROR_SOUND = ""
 
 # Toggle this to show/hide the end screen
-END_SCREEN_ENABLED = False
+END_SCREEN_ENABLED = True
 
-BACKGROUND = "#050505"
-TEXT_COLOR_DEFAULT = "#333333"
-TEXT_COLOR_CORRECT = "#9DFF91"
-TEXT_COLOR_ERROR   = "#FF6B6B"
+BACKGROUND = "#000000"
+TEXT_COLOR_DEFAULT = "#A4A3A3"
+TEXT_COLOR_CORRECT = "#238616"
+TEXT_COLOR_ERROR   = "#EA5B5B"
 CURSOR_COLOR       = "#1E1E1E"
 
 FONT_FAMILY = "FiraCode Nerd Font"
@@ -46,7 +46,8 @@ def play_sound(path):
     # try:
     #     # winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
     # except:
-        pass
+    #     pass
+    pass
 
 
 # ==========================
@@ -73,16 +74,39 @@ class TypingApp:
         self.total_keystrokes = 0        # all typed chars (no backspaces)
         self.correct_keystrokes = 0      # chars that were correct at the moment of typing
 
+        self.end_win = None  # handle to result window
+
         self.build_ui()
 
         self.root.bind("<Key>", self.on_key)
         self.root.bind("<F11>", self.toggle_fullscreen)
         self.root.bind("<Escape>", self.exit_fullscreen)
 
+        # Ctrl+R to reset
+        self.root.bind("<Control-r>", self.reset_session)
+        self.root.bind("<Control-R>", self.reset_session)
+
     def build_ui(self):
         top_bar = tk.Frame(self.root, bg=BACKGROUND)
         top_bar.pack(side="top", fill="x")
 
+        # RESET BUTTON
+        self.reset_button = tk.Button(
+            top_bar,
+            text="⟳",
+            command=self.reset_session,
+            fg="#777",
+            bg=BACKGROUND,
+            activeforeground="#fff",
+            activebackground=BACKGROUND,
+            font=(FONT_FAMILY, 16),
+            bd=0,
+            highlightthickness=0,
+            padx=10
+        )
+        self.reset_button.pack(side="right", padx=(0, 4), pady=10)
+
+        # FULLSCREEN BUTTON
         self.fullscreen_button = tk.Button(
             top_bar,
             text="⛶",
@@ -96,7 +120,7 @@ class TypingApp:
             highlightthickness=0,
             padx=10
         )
-        self.fullscreen_button.pack(side="right", padx=16, pady=10)
+        self.fullscreen_button.pack(side="right", padx=12, pady=10)
 
         # TEXT WIDGET
         self.text_widget = tk.Text(
@@ -115,26 +139,60 @@ class TypingApp:
 
         self.text_widget.insert("1.0", self.target_text)
 
-        # ---- TAGS (important part) ----
+        # ---- TAGS ----
         self.text_widget.tag_config(
             "correct",
             foreground=TEXT_COLOR_CORRECT,
-            # optional: subtle background for correct chars
-            # background="#102810"
         )
         self.text_widget.tag_config(
             "error",
             foreground=TEXT_COLOR_ERROR,
-            background="#401010"  # <-- this makes wrong spaces VISIBLE
+            background="#401010"  # makes wrong spaces visible
         )
         self.text_widget.tag_config("cursor", background=CURSOR_COLOR)
-        # -------------------------------
+        # --------------
 
         if len(self.target_text) > 0:
             self.text_widget.tag_add("cursor", "1.0", "1.0+1c")
 
         self.text_widget.config(state="disabled")
         self.text_widget.pack(expand=True, fill="both")
+
+    # --- RESET SESSION (also used by reset button & Ctrl+R & Enter on result) ---
+    def reset_session(self, event=None):
+        """Generate new text and reset all state for a new run."""
+        # Close result window if it exists
+        if self.end_win is not None and self.end_win.winfo_exists():
+            self.end_win.destroy()
+        self.end_win = None
+
+        self.target_text = generate_text(ALLOWED_CHARS, WORD_COUNT, MIN_WORD_LEN, MAX_WORD_LEN)
+        self.index = 0
+        self.started = False
+        self.finished = False
+
+        self.start_time = None
+        self.end_time = None
+        self.total_keystrokes = 0
+        self.correct_keystrokes = 0
+
+        self.text_widget.config(state="normal")
+        self.text_widget.delete("1.0", "end")
+        self.text_widget.insert("1.0", self.target_text)
+
+        # Clear all tags
+        self.text_widget.tag_remove("correct", "1.0", "end")
+        self.text_widget.tag_remove("error", "1.0", "end")
+        self.text_widget.tag_remove("cursor", "1.0", "end")
+
+        # Re-add cursor at start
+        if len(self.target_text) > 0:
+            self.text_widget.tag_add("cursor", "1.0", "1.0+1c")
+
+        self.text_widget.config(state="disabled")
+
+        # prevent Enter or Ctrl+R inserting chars in widgets
+        return "break"
 
     # --- Fullscreen handling ---
     def toggle_fullscreen(self, event=None):
@@ -170,6 +228,8 @@ class TypingApp:
     # --- Key input ---
     def on_key(self, event):
         if self.finished:
+            # When finished, we want Enter to act as "next/reset" **ONLY** when
+            # result screen is shown. That is handled in show_end_screen via focus.
             return
 
         # Backspace: doesn't count in accuracy stats
@@ -263,7 +323,7 @@ class TypingApp:
 
         word_count = len(self.target_text.split())
         if duration > 0:
-            wps = (word_count / duration)*60
+            wps = (word_count / duration) * 60
         else:
             wps = 0.0
 
@@ -274,14 +334,22 @@ class TypingApp:
                 duration=duration,
                 wps=wps
             )
+        else:
+            # If no end screen, immediately reset for a new session
+            self.reset_session()
 
     # --- End screen ---
     def show_end_screen(self, accuracy_corrected, accuracy_raw, duration, wps):
         end_win = tk.Toplevel(self.root)
+        self.end_win = end_win  # store reference
+
         end_win.title("Results")
         end_win.configure(bg=BACKGROUND)
-
         end_win.geometry("700x320")
+
+        # Make result window "own" focus so Enter works without clicking
+        end_win.grab_set()
+        end_win.focus_force()
 
         container = tk.Frame(end_win, bg=BACKGROUND, padx=30, pady=30)
         container.pack(expand=True, fill="both")
@@ -308,7 +376,7 @@ class TypingApp:
             f"Accuracy (with correction):    {fmt_pct(accuracy_corrected)}",
             f"Accuracy (without correction): {fmt_pct(accuracy_raw)}",
             f"Time:                          {fmt_time(duration)}",
-            f"WPM:                          {fmt_wps(wps)}",
+            f"WPM:                           {fmt_wps(wps)}",
         ]
 
         for line in stats:
@@ -323,10 +391,17 @@ class TypingApp:
             )
             lbl.pack(anchor="w")
 
+        # When closing, reset for a new text
+        def on_close():
+            self.reset_session()
+
+        # ENTER triggers reset (no need to click first)
+        end_win.bind("<Return>", lambda e: on_close())
+
         close_btn = tk.Button(
             container,
-            text="Close",
-            command=end_win.destroy,
+            text="Next (Enter)",
+            command=on_close,
             fg="#ffffff",
             bg="#222222",
             activeforeground="#ffffff",
