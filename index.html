@@ -35,9 +35,11 @@
       padding: 10px 16px;
       background: var(--bg);
       border-bottom: 1px solid #111;
+      gap: 4px;
     }
 
-    .fullscreen-btn {
+    .fullscreen-btn,
+    .settings-btn {
       background: transparent;
       border: none;
       color: #777;
@@ -45,7 +47,8 @@
       padding: 6px 12px;
       cursor: pointer;
     }
-    .fullscreen-btn:hover {
+    .fullscreen-btn:hover,
+    .settings-btn:hover {
       color: #fff;
     }
 
@@ -166,6 +169,124 @@
       pointer-events: none;
     }
 
+    /* Settings panel */
+    .settings-panel {
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      width: 320px;
+      max-width: 90vw;
+      background: #050505;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 16px 16px 12px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+      z-index: 15;
+    }
+
+    .settings-panel.hidden {
+      display: none;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      color: #ddd;
+      font-size: 16px;
+    }
+
+    .settings-close {
+      background: transparent;
+      border: none;
+      color: #777;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 2px 6px;
+    }
+
+    .settings-close:hover {
+      color: #fff;
+    }
+
+    .settings-section {
+      margin-bottom: 12px;
+      border-top: 1px solid #111;
+      padding-top: 8px;
+    }
+
+    .settings-section-title {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      gap: 8px;
+      font-size: 13px;
+      color: #bbb;
+    }
+
+    .settings-row label {
+      flex: 1;
+    }
+
+    .settings-row input[type="color"] {
+      width: 42px;
+      height: 24px;
+      padding: 0;
+      border-radius: 4px;
+      border: 1px solid #333;
+      background: #111;
+    }
+
+    .settings-row input[type="text"],
+    .settings-row input[type="number"] {
+      flex: 1;
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      background: #111;
+      color: #eee;
+      font-family: var(--font-main);
+      font-size: 13px;
+    }
+
+    .settings-row input[type="checkbox"] {
+      transform: scale(1.1);
+    }
+
+    .settings-row input[type="range"] {
+      flex: 1;
+    }
+
+    .settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    #resetColorsBtn {
+      margin-top: 4px;
+      width: 100%;
+      font-size: 12px;
+      padding: 4px 8px;
+      background: #222;
+      color: #eee;
+    }
+
+    #resetColorsBtn:hover {
+      background: #333;
+    }
+
     @media (max-width: 768px) {
       .typing-container {
         padding: 24px;
@@ -173,16 +294,100 @@
       .text-area {
         font-size: 18px;
       }
+      .settings-panel {
+        top: 52px;
+        right: 10px;
+        width: calc(100vw - 20px);
+      }
     }
   </style>
 </head>
 <body>
   <div class="top-bar">
+    <button class="settings-btn" id="settingsBtn" title="Settings">⚙</button>
     <button class="fullscreen-btn" id="fullscreenBtn" title="Toggle fullscreen">⛶</button>
   </div>
 
   <div class="typing-container" id="typingRoot">
     <div class="text-area" id="textArea"></div>
+  </div>
+
+  <!-- Settings panel -->
+  <div class="settings-panel hidden" id="settingsPanel">
+    <div class="settings-header">
+      <span>Settings</span>
+      <button class="settings-close" id="settingsCloseBtn" title="Close settings">✕</button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Colors</div>
+      <div class="settings-row">
+        <label for="colorBg">Background</label>
+        <input type="color" id="colorBg">
+      </div>
+      <div class="settings-row">
+        <label for="colorTextDefault">Text (default)</label>
+        <input type="color" id="colorTextDefault">
+      </div>
+      <div class="settings-row">
+        <label for="colorTextCorrect">Text (correct)</label>
+        <input type="color" id="colorTextCorrect">
+      </div>
+      <div class="settings-row">
+        <label for="colorTextError">Text (error)</label>
+        <input type="color" id="colorTextError">
+      </div>
+      <div class="settings-row">
+        <label for="colorCursorBg">Cursor background</label>
+        <input type="color" id="colorCursorBg">
+      </div>
+      <div class="settings-row">
+        <label for="colorErrorBg">Error background</label>
+        <input type="color" id="colorErrorBg">
+      </div>
+      <button class="btn" id="resetColorsBtn">Reset colors to default</button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Game</div>
+      <div class="settings-row">
+        <label for="lettersInput">Letters used</label>
+        <input type="text" id="lettersInput" maxlength="50">
+      </div>
+      <div class="settings-row">
+        <label for="wordCountInput">Word count</label>
+        <input type="number" id="wordCountInput" min="10" max="1000">
+      </div>
+      <div class="settings-row">
+        <label for="minLenInput">Min word length</label>
+        <input type="number" id="minLenInput" min="1" max="20">
+      </div>
+      <div class="settings-row">
+        <label for="maxLenInput">Max word length</label>
+        <input type="number" id="maxLenInput" min="1" max="20">
+      </div>
+      <div class="settings-row">
+        <label for="endScreenInput">Show end screen</label>
+        <input type="checkbox" id="endScreenInput" checked>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">UI</div>
+      <div class="settings-row">
+        <label for="fontSizeInput">Font size</label>
+        <input type="range" id="fontSizeInput" min="14" max="32" step="1">
+      </div>
+      <div class="settings-row">
+        <label for="showHintInput">Show hint text</label>
+        <input type="checkbox" id="showHintInput" checked>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn btn-close" id="settingsCancelBtn">Cancel</button>
+      <button class="btn btn-restart" id="settingsApplyBtn">Apply &amp; Restart</button>
+    </div>
   </div>
 
   <div class="overlay" id="endOverlay">
@@ -205,14 +410,22 @@
 
   <script>
     // ==========================
-    // CONFIG (matching Python)
+    // CONFIG (editable via settings)
     // ==========================
-    const ALLOWED_CHARS = "jkl;";
-    const WORD_COUNT = 200;
-    const MIN_WORD_LEN = 3;
-    const MAX_WORD_LEN = 7;
+    let ALLOWED_CHARS = "jkl;";
+    let WORD_COUNT = 200;
+    let MIN_WORD_LEN = 3;
+    let MAX_WORD_LEN = 7;
+    let END_SCREEN_ENABLED = true;
 
-    const END_SCREEN_ENABLED = true;
+    const DEFAULT_COLORS = [
+      { id: "colorBg", cssVar: "--bg", defaultValue: "#050505" },
+      { id: "colorTextDefault", cssVar: "--text-default", defaultValue: "#333333" },
+      { id: "colorTextCorrect", cssVar: "--text-correct", defaultValue: "#9DFF91" },
+      { id: "colorTextError", cssVar: "--text-error", defaultValue: "#FF6B6B" },
+      { id: "colorCursorBg", cssVar: "--cursor-bg", defaultValue: "#1E1E1E" },
+      { id: "colorErrorBg", cssVar: "--error-bg", defaultValue: "#401010" },
+    ];
 
     // ==========================
     // STATE
@@ -235,6 +448,22 @@
     const statWpm = document.getElementById("statWpm");
     const fullscreenBtn = document.getElementById("fullscreenBtn");
     const typingRoot = document.getElementById("typingRoot");
+
+    const settingsPanel = document.getElementById("settingsPanel");
+    const settingsBtn = document.getElementById("settingsBtn");
+    const settingsCloseBtn = document.getElementById("settingsCloseBtn");
+    const settingsApplyBtn = document.getElementById("settingsApplyBtn");
+    const settingsCancelBtn = document.getElementById("settingsCancelBtn");
+    const resetColorsBtn = document.getElementById("resetColorsBtn");
+
+    const lettersInput = document.getElementById("lettersInput");
+    const wordCountInput = document.getElementById("wordCountInput");
+    const minLenInput = document.getElementById("minLenInput");
+    const maxLenInput = document.getElementById("maxLenInput");
+    const endScreenInput = document.getElementById("endScreenInput");
+    const fontSizeInput = document.getElementById("fontSizeInput");
+    const showHintInput = document.getElementById("showHintInput");
+    const hintEl = document.querySelector(".hint");
 
     // ==========================
     // HELPERS
@@ -371,6 +600,91 @@
       renderText();
     }
 
+    // Color helpers
+    function setColorVar(cssVar, value) {
+      document.documentElement.style.setProperty(cssVar, value);
+    }
+
+    function initColorSettings() {
+      DEFAULT_COLORS.forEach(cfg => {
+        const input = document.getElementById(cfg.id);
+        if (!input) return;
+        input.value = cfg.defaultValue;
+        setColorVar(cfg.cssVar, cfg.defaultValue);
+        input.addEventListener("input", () => {
+          setColorVar(cfg.cssVar, input.value);
+        });
+      });
+    }
+
+    function resetColorDefaults() {
+      DEFAULT_COLORS.forEach(cfg => {
+        const input = document.getElementById(cfg.id);
+        if (!input) return;
+        input.value = cfg.defaultValue;
+        setColorVar(cfg.cssVar, cfg.defaultValue);
+      });
+    }
+
+    // Settings init
+    function initSettingsValues() {
+      // Game settings
+      lettersInput.value = ALLOWED_CHARS;
+      wordCountInput.value = WORD_COUNT;
+      minLenInput.value = MIN_WORD_LEN;
+      maxLenInput.value = MAX_WORD_LEN;
+      endScreenInput.checked = END_SCREEN_ENABLED;
+
+      // UI settings
+      const currentFontSize = parseInt(
+        window.getComputedStyle(textArea).fontSize,
+        10
+      ) || 20;
+      fontSizeInput.value = currentFontSize;
+      textArea.style.fontSize = currentFontSize + "px";
+
+      showHintInput.checked = true;
+      if (hintEl) hintEl.style.display = "block";
+    }
+
+    function applySettings() {
+      const lettersValue = lettersInput.value.trim();
+      if (lettersValue.length > 0) {
+        ALLOWED_CHARS = lettersValue;
+      }
+
+      const wc = parseInt(wordCountInput.value, 10);
+      if (!isNaN(wc) && wc > 0) {
+        WORD_COUNT = wc;
+      }
+
+      let minLenVal = parseInt(minLenInput.value, 10);
+      let maxLenVal = parseInt(maxLenInput.value, 10);
+      if (!isNaN(minLenVal) && !isNaN(maxLenVal) && minLenVal > 0 && maxLenVal > 0) {
+        if (minLenVal > maxLenVal) {
+          // Swap to keep things sane
+          [minLenVal, maxLenVal] = [maxLenVal, minLenVal];
+          minLenInput.value = minLenVal;
+          maxLenInput.value = maxLenVal;
+        }
+        MIN_WORD_LEN = minLenVal;
+        MAX_WORD_LEN = maxLenVal;
+      }
+
+      END_SCREEN_ENABLED = endScreenInput.checked;
+
+      const fontSizeVal = parseInt(fontSizeInput.value, 10);
+      if (!isNaN(fontSizeVal) && fontSizeVal >= 10 && fontSizeVal <= 60) {
+        textArea.style.fontSize = fontSizeVal + "px";
+      }
+
+      if (hintEl) {
+        hintEl.style.display = showHintInput.checked ? "block" : "none";
+      }
+
+      restartSession();
+    }
+
     // ==========================
     // EVENT HANDLERS
     // ==========================
@@ -447,10 +761,21 @@
       }
     }
 
+    // Settings panel toggling
+    function openSettings() {
+      settingsPanel.classList.remove("hidden");
+    }
+
+    function closeSettings() {
+      settingsPanel.classList.add("hidden");
+    }
+
     // ==========================
     // INIT
     // ==========================
 
+    initColorSettings();
+    initSettingsValues();
     restartSession();
 
     document.addEventListener("keydown", onKeyDown);
@@ -464,7 +789,33 @@
       overlay.classList.remove("visible");
     });
 
-    // Optional: clicking in text area focuses document for typing
+    // Settings events
+    settingsBtn.addEventListener("click", () => {
+      if (settingsPanel.classList.contains("hidden")) {
+        openSettings();
+      } else {
+        closeSettings();
+      }
+    });
+
+    settingsCloseBtn.addEventListener("click", () => {
+      closeSettings();
+    });
+
+    settingsCancelBtn.addEventListener("click", () => {
+      closeSettings();
+    });
+
+    settingsApplyBtn.addEventListener("click", () => {
+      applySettings();
+      closeSettings();
+    });
+
+    resetColorsBtn.addEventListener("click", () => {
+      resetColorDefaults();
+    });
+
+    // Optional: clicking in text area keeps interaction intuitive
     textArea.addEventListener("click", () => {
       // nothing needed, but keeps interaction intuitive
     });
