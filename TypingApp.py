@@ -17,7 +17,7 @@ MODE = 2
 # CONFIG
 # ==========================
 
-ALLOWED_CHARS = "asdfghjkl;tuyrinvmcx"
+ALLOWED_CHARS = "asdfjkl;gh"
 
 # Random generator settings (Mode 1 only)
 RANDOM_MIN_LEN = 2
