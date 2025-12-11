@@ -7,11 +7,9 @@ import os
 # ==========================
 # MODE SELECTOR
 # ==========================
-# 1 = random words
-# 2 = book filtered by ALLOWED_CHARS
-# 3 = raw book text
-#
-# Add .txt books into a folder named "books"
+# 1 = random words (nonsense)
+# 2 = dictionary words based on allowed letters
+# 3 = raw book text (ignores allowed letters)
 MODE = 2
 
 
@@ -19,10 +17,13 @@ MODE = 2
 # CONFIG
 # ==========================
 
-ALLOWED_CHARS = "asdf"
+ALLOWED_CHARS = "asdfghjkl;tuyrinvmcx"
+
+# Random generator settings (Mode 1 only)
+RANDOM_MIN_LEN = 2
+RANDOM_MAX_LEN = 4
+
 WORD_COUNT = 50
-MIN_WORD_LEN = 2
-MAX_WORD_LEN = 4 
 
 BACKGROUND = "#000000"
 TEXT_COLOR_DEFAULT = "#BEBABA"
@@ -40,24 +41,74 @@ ERROR_SOUND = ""
 
 
 # ==========================
-# TEXT GENERATION
+# RANDOM WORD MODE (Mode 1)
 # ==========================
 
-def generate_random_words(chars, word_count, min_len, max_len):
-    return " ".join(
-        "".join(random.choice(chars) for _ in range(random.randint(min_len, max_len)))
-        for _ in range(word_count)
-    )
+def generate_random_words(chars, count, min_len, max_len):
+    words = []
+    for _ in range(count):
+        length = random.randint(min_len, max_len)
+        words.append("".join(random.choice(chars) for _ in range(length)))
+    return " ".join(words)
 
 
-def load_random_book_text(raw=False):
+# ==========================
+# DICTIONARY MODE (Mode 2)
+# ==========================
+
+def load_dictionary(path="words/words.txt"):
+    """Load a dictionary file into a list of words."""
+    if not os.path.exists(path):
+        print("ERROR: Dictionary file not found:", path)
+        return []
+
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            words = [w.strip().lower() for w in f if w.strip()]
+        return words
+    except Exception as e:
+        print("ERROR reading dictionary:", e)
+        return []
+
+
+def filter_dictionary_by_allowed_letters(words, allowed):
+    """Return only words made entirely of letters in ALLOWED_CHARS."""
+    allowed_set = set(allowed)
+    filtered = []
+
+    for w in words:
+        if all((c in allowed_set) for c in w):
+            filtered.append(w)
+
+    return filtered
+
+
+def generate_dictionary_words():
+    """Generate words from dictionary using allowed letters. Mode 2."""
+    dictionary = load_dictionary("words/words.txt")
+
+    valid_words = filter_dictionary_by_allowed_letters(dictionary, ALLOWED_CHARS)
+
+    if not valid_words:
+        print("ERROR: No dictionary words can be formed using:", ALLOWED_CHARS)
+        print("Falling back to MODE 1 (random letters).")
+        return generate_random_words(ALLOWED_CHARS, WORD_COUNT, RANDOM_MIN_LEN, RANDOM_MAX_LEN)
+
+    return " ".join(random.choice(valid_words) for _ in range(WORD_COUNT))
+
+
+# ==========================
+# BOOK MODE (Mode 3)
+# ==========================
+
+def load_random_book_text():
     folder = "books"
     if not os.path.exists(folder):
         return "NO BOOKS FOUND — create a folder named 'books' and add .txt files."
 
     files = [f for f in os.listdir(folder) if f.lower().endswith(".txt")]
     if not files:
-        return "NO .TXT FILES IN books/ — download books from Project Gutenberg."
+        return "NO .TXT FILES IN books/ — download books."
 
     path = os.path.join(folder, random.choice(files))
 
@@ -67,7 +118,6 @@ def load_random_book_text(raw=False):
     except:
         return "FAILED TO READ BOOK FILE."
 
-    # pick random chunk
     words = text.split()
     if len(words) < 200:
         chunk = words
@@ -75,55 +125,29 @@ def load_random_book_text(raw=False):
         start = random.randint(0, len(words) - 200)
         chunk = words[start:start + 200]
 
-    raw_text = " ".join(chunk)
-
-    if raw:
-        return raw_text  # MODE 3
-
-    # ==========================
-    # MODE 2 (FILTERED)
-    # ==========================
-
-    allowed = set(ALLOWED_CHARS)
-
-    # Keep only allowed characters
-    filtered_chars = [
-        ch.lower()
-        for ch in raw_text
-        if ch.lower() in allowed
-    ]
-
-    # Join into one long stream (no spaces)
-    stream = "".join(filtered_chars)
-
-    if not stream:
-        return "NO MATCHING CHARACTERS IN BOOK FOR FILTER MODE."
-
-    # Build words with min/max length
-    result_words = []
-    i = 0
-    while i < len(stream):
-        length = random.randint(MIN_WORD_LEN, MAX_WORD_LEN)
-        word = stream[i:i + length]
-        result_words.append(word)
-        i += length
-
-    return " ".join(result_words)
-
-
-
-def get_text_for_mode():
-    return (
-        generate_random_words(ALLOWED_CHARS, WORD_COUNT, MIN_WORD_LEN, MAX_WORD_LEN)
-        if MODE == 1 else
-        load_random_book_text(raw=False)
-        if MODE == 2 else
-        load_random_book_text(raw=True)
-    )
+    return " ".join(chunk)
 
 
 # ==========================
-# SOUND PLACEHOLDER
+# MAIN MODE LOGIC
+# ==========================
+
+def get_text_for_mode():
+    if MODE == 1:
+        return generate_random_words(ALLOWED_CHARS, WORD_COUNT, RANDOM_MIN_LEN, RANDOM_MAX_LEN)
+
+    elif MODE == 2:
+        return generate_dictionary_words()
+
+    elif MODE == 3:
+        return load_random_book_text()
+
+    else:
+        return "INVALID MODE"
+
+
+# ==========================
+# SOUND (unused)
 # ==========================
 
 def play_sound(path):
@@ -167,8 +191,6 @@ class TypingApp:
         top_bar = tk.Frame(self.root, bg=BACKGROUND)
         top_bar.pack(side="top", fill="x")
 
-        # Removed the mode label here
-
         reset_button = tk.Button(
             top_bar, text="⟳", command=self.reset_session,
             fg="#777", bg=BACKGROUND,
@@ -187,10 +209,19 @@ class TypingApp:
         )
         fullscreen_button.pack(side="right", padx=12, pady=10)
 
+        # typing area
         self.text_widget = tk.Text(
-            self.root, font=(FONT_FAMILY, FONT_SIZE), bg=BACKGROUND,
-            fg=TEXT_COLOR_DEFAULT, wrap="word", bd=0, highlightthickness=0,
-            padx=80, pady=40, spacing3=8, height=6
+            self.root,
+            font=(FONT_FAMILY, FONT_SIZE),
+            bg=BACKGROUND,
+            fg=TEXT_COLOR_DEFAULT,
+            wrap="word",
+            bd=0,
+            highlightthickness=0,
+            padx=80,
+            pady=40,
+            spacing3=8,
+            height=6
         )
 
         self.text_widget.insert("1.0", self.target_text)
@@ -215,6 +246,7 @@ class TypingApp:
         self.index = 0
         self.started = False
         self.finished = False
+
         self.start_time = None
         self.end_time = None
         self.total_keystrokes = 0
@@ -361,7 +393,7 @@ class TypingApp:
             f"Accuracy (raw):       {accuracy_raw:.1f}%",
             f"Time:                 {duration:.2f} s",
             f"WPM:                  {wpm:.2f}",
-            f"Letters per minute:   {lpm:.2f}",
+            f"LPM:                  {lpm:.2f}",
         ]
 
         for line in data:
